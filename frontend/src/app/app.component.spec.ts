@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { AppComponent } from './app.component';
 import { BrokerApiService } from './broker-api.service';
 import { BrokerState, CostReport, JobRecord, NodeRecord } from './broker.models';
@@ -147,6 +147,45 @@ describe('AppComponent', () => {
     component.refresh();
     expect(component.errorMessage).toContain('Check that the broker API is running');
     expect(component.isLoading).toBeFalse();
+  });
+
+  it('runs a manual refresh queued during an automatic refresh and shows progress', () => {
+    const component = fixture.componentInstance;
+    const firstState = new Subject<BrokerState>();
+    const firstCosts = new Subject<CostReport>();
+    const secondState = new Subject<BrokerState>();
+    const secondCosts = new Subject<CostReport>();
+    api.getState.and.returnValues(firstState, secondState);
+    api.getCosts.and.returnValues(firstCosts, secondCosts);
+    api.getState.calls.reset();
+    api.getCosts.calls.reset();
+
+    component.refresh();
+    component.refresh(true);
+    fixture.detectChanges();
+
+    const refreshButton: HTMLButtonElement =
+      fixture.nativeElement.querySelector('.queue-panel .subtle-button');
+    expect(component.isRefreshing).toBeTrue();
+    expect(refreshButton.disabled).toBeTrue();
+    expect(refreshButton.textContent).toContain('Refreshing…');
+
+    firstState.next(EMPTY_STATE);
+    firstState.complete();
+    firstCosts.next(EMPTY_COSTS);
+    firstCosts.complete();
+
+    expect(api.getState).toHaveBeenCalledTimes(2);
+    expect(component.isRefreshing).toBeTrue();
+    secondState.next(EMPTY_STATE);
+    secondState.complete();
+    secondCosts.next(EMPTY_COSTS);
+    secondCosts.complete();
+
+    fixture.detectChanges();
+    expect(component.isRefreshing).toBeFalse();
+    expect(refreshButton.disabled).toBeFalse();
+    expect(refreshButton.textContent).toContain('Refresh');
   });
 
   it('calculates dashboard metrics and formatting helpers', () => {

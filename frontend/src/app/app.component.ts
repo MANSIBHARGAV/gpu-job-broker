@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, interval, Subscription } from 'rxjs';
+import { finalize, forkJoin, interval, Subscription } from 'rxjs';
 import {
   BrokerState,
   CostReport,
@@ -45,6 +45,7 @@ export class AppComponent implements OnInit, OnDestroy {
   jobForm: JobForm = this.emptyJobForm();
   advanceMinutes = 10;
   isLoading = true;
+  isRefreshing = false;
   isSubmitting = false;
   isAdvancing = false;
   cancellingJobId: string | null = null;
@@ -54,7 +55,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private readonly subscriptions = new Subscription();
   private refreshRequest: Subscription | null = null;
-  private refreshing = false;
+  private refreshPending = false;
 
   constructor(private readonly api: BrokerApiService) {}
 
@@ -104,27 +105,31 @@ export class AppComponent implements OnInit, OnDestroy {
     return Math.max(...this.teamCosts.map(team => team.cost), 1);
   }
 
-  refresh(): void {
-    if (this.refreshing) {
+  refresh(manual = false): void {
+    if (this.isRefreshing) {
+      this.refreshPending ||= manual;
       return;
     }
-    this.refreshing = true;
+    this.isRefreshing = true;
     this.refreshRequest = forkJoin({
       state: this.api.getState(),
       costs: this.api.getCosts()
-    }).subscribe({
+    }).pipe(finalize(() => {
+      this.isRefreshing = false;
+      this.isLoading = false;
+      if (this.refreshPending) {
+        this.refreshPending = false;
+        this.refresh(true);
+      }
+    })).subscribe({
       next: result => {
         this.state = result.state;
         this.costs = result.costs;
         this.lastUpdated = new Date();
         this.errorMessage = '';
-        this.refreshing = false;
-        this.isLoading = false;
       },
       error: (error: unknown) => {
         this.errorMessage = this.errorText(error);
-        this.refreshing = false;
-        this.isLoading = false;
       }
     });
   }
@@ -141,7 +146,7 @@ export class AppComponent implements OnInit, OnDestroy {
           this.successMessage = `Job ${job.id.slice(0, 8)} submitted.`;
           this.jobForm = this.emptyJobForm();
           this.isSubmitting = false;
-          this.refresh();
+          this.refresh(true);
         },
         error: (error: unknown) => {
           this.errorMessage = this.errorText(error);
@@ -159,7 +164,7 @@ export class AppComponent implements OnInit, OnDestroy {
         next: cancelled => {
           this.successMessage = `Job ${cancelled.id.slice(0, 8)} cancelled.`;
           this.cancellingJobId = null;
-          this.refresh();
+          this.refresh(true);
         },
         error: (error: unknown) => {
           this.errorMessage = this.errorText(error);
@@ -181,7 +186,7 @@ export class AppComponent implements OnInit, OnDestroy {
         next: state => {
           this.state = state;
           this.isAdvancing = false;
-          this.refresh();
+          this.refresh(true);
         },
         error: (error: unknown) => {
           this.errorMessage = this.errorText(error);
