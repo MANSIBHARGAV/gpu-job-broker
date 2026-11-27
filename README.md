@@ -171,7 +171,7 @@ recorded terminal outcome.
 | Priority + team round-robin | nlp | 6.32 | 17.48 | 40.18 |
 | Priority + team round-robin | platform | 4.02 | 41.58 | 197.23 |
 | Priority + team round-robin | speech | 6.50 | 22.97 | 78.40 |
-| Priority + team round-robin | vision | 89.30 | 230.85 | 248.05 |
+| Priority + team round-robin | vision | 89.30 | 230.45 | 248.05 |
 | Submission-order FIFO | forecast | 5.35 | 43.00 | 44.32 |
 | Submission-order FIFO | nlp | 6.75 | 34.72 | 51.00 |
 | Submission-order FIFO | platform | 0.00 | 284.68 | 285.68 |
